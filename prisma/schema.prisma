@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Property {
+  id          Int      @id @default(autoincrement())
+  reference   String   @unique
+  title       String
+  operation   String
+  type        String
+  zone        String
+  price       Int
+  bedrooms    Int      @default(0)
+  area        Int
+  status      String   @default("available")
+  description String?
+  photos      PropertyPhoto[]
+  visits      Visit[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([operation, status])
+}
+
+// Las fotos de cada inmueble. El archivo vive en storage/photos y aquí solo se guarda su
+// ruta. La foto con la posición más baja es la portada.
+model PropertyPhoto {
+  id         Int      @id @default(autoincrement())
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId Int
+  path       String
+  position   Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([propertyId, position])
+}
+
+model Contact {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String?
+  phone     String?
+  notes     String?
+  demands   Demand[]
+  visits    Visit[]
+  units     Unit[]
+  inquiries Inquiry[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Demand {
+  id          Int      @id @default(autoincrement())
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId   Int
+  operation   String
+  type        String?
+  zone        String?
+  maxPrice    Int
+  minBedrooms Int      @default(0)
+  minArea     Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Visit {
+  id          Int      @id @default(autoincrement())
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId  Int
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId   Int
+  scheduledAt DateTime
+  outcome     String   @default("pending")
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([scheduledAt])
+}
+
+// Las promociones de obra nueva que comercializa la agencia.
+model Development {
+  id          Int      @id @default(autoincrement())
+  name        String
+  slug        String   @unique
+  zone        String
+  address     String
+  description String
+  // Las plantas sobre la baja. La última es la de los áticos.
+  floors      Int
+  // La fecha de entrega en texto, porque en obra nueva casi siempre es aproximada.
+  delivery    String
+  // Las rutas de las imágenes, en una lista JSON. La primera es la portada.
+  images      Json
+  units       Unit[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Las viviendas de cada promoción, identificadas por su planta y su letra.
+model Unit {
+  id            Int         @id @default(autoincrement())
+  development   Development @relation(fields: [developmentId], references: [id], onDelete: Cascade)
+  developmentId Int
+  floor         Int
+  letter        String
+  bedrooms      Int
+  bathrooms     Int
+  area          Int
+  // Los metros de terraza o de jardín, si los tiene.
+  outdoorArea   Int         @default(0)
+  price         Int
+  status        String      @default("available")
+  // El cliente que la ha reservado o comprado.
+  contact       Contact?    @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contactId     Int?
+  inquiries     Inquiry[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([developmentId, floor, letter])
+}
+
+// Las peticiones de información que llegan desde la ficha pública de la promoción.
+model Inquiry {
+  id        Int      @id @default(autoincrement())
+  unit      Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  unitId    Int
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId Int
+  message   String?
+  createdAt DateTime @default(now())
+}
